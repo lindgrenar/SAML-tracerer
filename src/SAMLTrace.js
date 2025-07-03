@@ -236,32 +236,41 @@ SAMLTrace.Request.prototype = {
     }
   },
   'parseProtocol' : function() {
-    const isParameterInCollection = (parameter, collection) => {
-      return collection.findIndex(item => item[0] === parameter) !== -1;
+    this.inspectBodyForProtocol(this.get, this.post);
+  },
+  'inspectBodyForProtocol' : function(getParameters, postParameters) {
+    const isParameterInCollection = (parameterName, collection) => {
+      return collection.findIndex(item => item[0] === parameterName) !== -1;
     };
+
 
     const isAnyParameterInCollection = (parameters, collection) => {
       if (!collection) {
         return false;
       }
-      return parameters.some(parameter => isParameterInCollection(parameter, collection));
+      return parameters.some(parameterName => isParameterInCollection(parameterName, collection));
     };
 
-    const isSamlProtocol = () => {
+    const isSamlProtocol = (getParameters, postParameters) => {
       const parameters = ["SAMLRequest", "SAMLResponse", "SAMLart"];
-      let isInGet = isAnyParameterInCollection(parameters, this.get);
-      let isInPost = isAnyParameterInCollection(parameters, this.post);
+      let isInGet = isAnyParameterInCollection(parameters, getParameters);
+      let isInPost = isAnyParameterInCollection(parameters, postParameters);
       return isInGet || isInPost;
     };
-    
-    const isWsFederation = () => {
+
+    const isWsFederation = (getParameters, postParameters) => {
       // all probably relevant WS-Federation parameters -> ["wa", "wreply", "wres", "wctx", "wp", "wct", "wfed", "wencoding", "wtrealm", "wfresh", "wauth", "wreq", "whr", "wreqptr", "wresult", "wresultptr", "wattr", "wattrptr", "wpseudo", "wpseudoptr"];
       // the most common ones should suffice:
       const parameters = ["wa", "wreply", "wctx", "wtrealm", "whr", "wresult"];
-      let isInGet = isAnyParameterInCollection(parameters, this.get);
-      let isInPost = isAnyParameterInCollection(parameters, this.post);
+      let isInGet = isAnyParameterInCollection(parameters, getParameters);
+      let isInPost = isAnyParameterInCollection(parameters, postParameters);
       return isInGet || isInPost;
     };
+
+    if (this.protocol) {
+      // Only determine the protocol if it hasn't already been determined
+      return;
+    }
 
     if (isSamlProtocol()) {
       this.protocol = "SAML-P";
@@ -600,6 +609,7 @@ SAMLTrace.TraceWindow = function() {
   this.hideResources = true;
   this.showProtocolOnly = false;
   this.colorizeRequests = true;
+  this.filter = null;
 };
 
 SAMLTrace.TraceWindow.prototype = {
@@ -645,6 +655,24 @@ SAMLTrace.TraceWindow.prototype = {
     return false;
   },
 
+  'setFilter' : function(filterText) {
+    try {
+      this.filter = Filters.parse(filterText);
+    } catch (e) {
+      this.filter = null;
+      dump("Filter error: " + e + "\n");
+    }
+    this.applyFilter();
+  },
+
+  'applyFilter' : function() {
+    this.requests.forEach(function(request) {
+      var requestItem = document.getElementById(request.uniqueId);
+      var isMatch = this.filter === null || this.filter.matches(request);
+      requestItem.style.display = isMatch ? "" : "none";
+    }, this);
+  },
+
   'addRequestItem' : function(request, getResponse) {
     var samlTracerRequest = new SAMLTrace.Request(request, getResponse);
     this.requests.push(samlTracerRequest);
@@ -663,6 +691,8 @@ SAMLTrace.TraceWindow.prototype = {
     if (this.autoScroll) {
       requestList.scrollTop = requestList.scrollHeight;
     }
+
+    this.applyFilter();
   },
 
   'resetList' : function() {

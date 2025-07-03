@@ -123,6 +123,76 @@ ui = {
     modalCloseButtons.forEach(button => button.addEventListener("click", ui.hideDialogs, true));
   },
   
+  bindButtons: function() {
+    document.getElementById("button-clear").addEventListener("click", () => {
+      window.tracer.clearRequests();
+    }, true);
+    document.getElementById("button-pause").addEventListener("click", e => {
+      let newState = ui.toggleButtonState(e.target);
+      window.tracer.setPauseTracing(newState);
+    }, true);
+    document.getElementById("button-autoscroll").addEventListener("click", e => {
+      let newState = ui.toggleButtonState(e.target);
+      window.tracer.setAutoscroll(newState);
+      if (newState === true) {
+        let requestList = document.getElementById("request-list");
+        requestList.scrollTop = requestList.scrollTopMax;
+      }
+    }, true);
+    document.getElementById("button-colorize").addEventListener("click", e => {
+      let newState = ui.toggleButtonState(e.target);
+      window.tracer.setColorizeRequests(newState);
+      let allRequests = document.getElementsByClassName("list-row");
+      if (newState) {
+        Array.from(allRequests).forEach(row => row.classList.remove("monochrome"));
+      } else {
+        Array.from(allRequests).forEach(row => row.classList.add("monochrome"));
+      }
+    }, true);
+    document.getElementById("button-export-list").addEventListener("click", () => {
+      let exportDialog = document.getElementById("exportDialog");
+      exportDialog.style.visibility = "visible";
+      let exportDialogContent = document.getElementById("exportDialogContent");
+      exportDialogContent.contentWindow.ui.setupContent(window.tracer.httpRequests, window.tracer.hideResources, window.tracer.showProtocolRequestsOnly);
+    }, true);
+    document.getElementById("button-import-list").addEventListener("click", () => {
+      let importDialog = document.getElementById("importDialog");
+      importDialog.style.visibility = "visible";
+      let importDialogContent = document.getElementById("importDialogContent");
+      importDialogContent.contentWindow.ui.setupContent();
+    }, true);
+
+    let modalCloseButtons = document.querySelectorAll(".modal-close");
+    modalCloseButtons.forEach(button => button.addEventListener("click", ui.hideDialogs, true));
+
+    document.getElementById('button-filter').addEventListener('click', (e) => {
+        document.getElementById('filter-options').classList.toggle('show');
+    });
+
+    document.querySelectorAll('#filter-options a').forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            const filterType = e.target.getAttribute('data-filter');
+            window.tracer.setFilter(filterType);
+            document.getElementById('filter-options').classList.remove('show');
+            document.getElementById('button-filter').textContent = e.target.textContent;
+        });
+    });
+
+    // Close the dropdown if the user clicks outside of it
+    window.onclick = function(event) {
+      if (!event.target.matches('#button-filter')) {
+        var dropdowns = document.getElementsByClassName("dropdown-content");
+        for (var i = 0; i < dropdowns.length; i++) {
+          var openDropdown = dropdowns[i];
+          if (openDropdown.classList.contains('show')) {
+            openDropdown.classList.remove('show');
+          }
+        }
+      }
+    }
+  },
+  
   bindKeys: function() {
     const closeDialogs = e => {
       // close dialogs when ESC is pressed
