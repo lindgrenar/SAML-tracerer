@@ -319,6 +319,25 @@ SAMLTrace.Request.prototype = {
   }
 };
 
+SAMLTrace.parseCertificate = function(base64CertString) {
+  try {
+    // Remove headers, footers, and whitespace
+    const certString = base64CertString
+      .replace(/-----BEGIN CERTIFICATE-----/g, '')
+      .replace(/-----END CERTIFICATE-----/g, '')
+      .replace(/\s/g, '');
+
+    const buffer = Uint8Array.from(atob(certString), c => c.charCodeAt(0)).buffer;
+    const asn1 = asn1js.fromBER(buffer);
+    const certificate = new pkijs.Certificate({ schema: asn1.result });
+    return certificate;
+  } catch (e) {
+    console.error("Error parsing certificate:", e);
+    return null;
+  }
+};
+
+
 SAMLTrace.RequestItem = function(request) {
   this.request = request;
 

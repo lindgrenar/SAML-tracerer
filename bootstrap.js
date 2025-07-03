@@ -2,6 +2,8 @@
 // https://developer.mozilla.org/en-US/Add-ons/WebExtensions/Anatomy_of_a_WebExtension#Specifying_background_scripts
 // The onOpenWindow event handler was slightly modified to be compatible with standard Firefox.
 
+const flowState = new Map();
+
 var browser = browser || chrome
 browser.action.onClicked.addListener((tab) => showTracerWindow());
 
@@ -45,3 +47,20 @@ function onCloseExtensionWindow(windowId) {
   console.log(`Window ${windowId} is closed. Setting "traceWindow" to null.`)
   tracerWindow = null
 }
+
+function determineFlowId(requestDetails, flowState) {
+  // Basic implementation: use the initiator and tabId as a flow ID.
+  // A more sophisticated approach might consider correlating requests and responses.
+  const flowId = `${requestDetails.initiator || 'unknown'}-${requestDetails.tabId}`;
+  if (!flowState.has(flowId)) {
+    flowState.set(flowId, { requests: [] });
+  }
+  return flowId;
+}
+
+browser.webRequest.onBeforeSendHeaders.addListener(
+  (details) => {
+    details.flowId = determineFlowId(details, flowState);
+    // Assume a message passing mechanism exists to send details to the UI
+    // browser.runtime.sendMessage({ type: "newRequest", details: details });
+  }, { urls: ["<all_urls>"] }, ["requestHeaders"]);

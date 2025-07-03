@@ -7,6 +7,7 @@
         <link rel="stylesheet" href="resources/css/buttons.css" type="text/css">
         <link rel="stylesheet" href="resources/css/modal.css" type="text/css">
         <link rel="stylesheet" href="resources/css/syntax.css" type="text/css">
+        <link rel="stylesheet" href="resources/css/modern.css" type="text/css">
     </head>
     <body class="not-selectable">
         <div id="header">
@@ -31,6 +32,8 @@
         <div id="request-info-tabbox"></div>
         <div id="request-info-content" class="is-selectable" tabindex="1"></div>
         <div id="statuspanel"></div>
+        <button id="certificate-tab" style="display: none;">Certificate</button>
+        <div id="certificate-content"></div>
 
         <div id="exportDialog" class="modal">
             <div class="modal-inner">
@@ -48,6 +51,7 @@
         <script type="text/javascript" src="../lib/pako_inflate.min.js"></script>
         <script type="text/javascript" src="../lib/highlight.min.js"></script>
         <script type="text/javascript" src="splitter.js"></script>
+        <script type="text/javascript" src="pkijs.min.js"></script>
         <script type="text/javascript" src="hash.js"></script>
         <script type="text/javascript" src="SAMLTrace.js"></script>
         <script type="text/javascript" src="ui.js"></script>
