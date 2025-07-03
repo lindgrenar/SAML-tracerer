@@ -146,6 +146,7 @@ SAMLTrace.Request = function(request, getResponse) {
   this.parsePOST();
   this.parseProtocol();
   this.parseSAML();
+ this.parseCertificatesInSAML();
 };
 SAMLTrace.Request.prototype = {
   'loadRequestHeaders' : function(request) {
@@ -316,6 +317,21 @@ SAMLTrace.Request.prototype = {
       query.to(value);
       return value !== null;
     });
+  },
+  'parseCertificatesInSAML': function() {
+    this.certificates = [];
+    if (!this.saml) {
+      return;
+    }
+    const parser = new DOMParser();
+    const xmldoc = parser.parseFromString(this.saml, "text/xml");
+    const certificates = xmldoc.getElementsByTagNameNS('http://www.w3.org/2000/09/xmldsig#', 'X509Certificate');
+
+    for (let i = 0; i < certificates.length; i++) {
+      const certText = certificates[i].textContent.trim();
+      const parsedCert = SAMLTrace.parseCertificate(certText);
+      if (parsedCert) this.certificates.push(parsedCert);
+    }
   }
 };
 
@@ -348,6 +364,9 @@ SAMLTrace.RequestItem = function(request) {
   if (this.request.saml != null || this.request.samlart != null) {
     this.availableTabs.push('SAML');
     this.availableTabs.push('Summary');
+  }
+  if (this.request.certificates && this.request.certificates.length > 0) {
+ this.availableTabs.push('Certificate');
   }
 };
 SAMLTrace.RequestItem.prototype = {
@@ -554,6 +573,34 @@ SAMLTrace.RequestItem.prototype = {
     target.appendChild(samlSummary);
   },
 
+ 'showCertificate': function(target) {
+ if (!this.request.certificates || this.request.certificates.length === 0) {
+ return;
+    }
+
+ const table = document.createElement("table");
+
+ for (const cert of this.request.certificates) {
+ const appendRow = (key, value) => {
+ const tr = document.createElement("tr");
+ const tdKey = document.createElement("td");
+ tdKey.innerText = key;
+ tdKey.classList.add("hljs-attribute");
+ const tdValue = document.createElement("td");
+ tdValue.innerText = value;
+ tr.appendChild(tdKey);
+ tr.appendChild(tdValue);
+ table.appendChild(tr);
+      };
+ appendRow('Subject', cert.subject.toString());
+ appendRow('Issuer', cert.issuer.toString());
+ appendRow('Serial Number', SAMLTrace.bin2hex(cert.serialNumber.valueBlock.valueHex));
+ appendRow('Valid From', cert.notBefore.value);
+ appendRow('Valid To', cert.notAfter.value);
+    }
+ target.appendChild(table);
+  },
+
   'showContent' : function(target, type) {
     target.innerText = "";
     switch (type) {
@@ -568,6 +615,9 @@ SAMLTrace.RequestItem.prototype = {
       break;
     case 'Summary':
       this.showSummary(target);
+      break;
+ case 'Certificate':
+ this.showCertificate(target);
       break;
     }
   },
@@ -591,6 +641,9 @@ SAMLTrace.RequestItem.prototype = {
     uniqueRequestId.create(id => hbox.setAttribute('id', id));
     hbox.setAttribute('class', 'list-row');
     if (this.request.protocol) {
+ if (this.request.request.req.flowId) {
+ hbox.classList.add('flow-indent');
+ }
       hbox.classList.add('is-protocol');
     }
     hbox.appendChild(methodLabel);
@@ -629,6 +682,7 @@ SAMLTrace.TraceWindow = function() {
   this.showProtocolOnly = false;
   this.colorizeRequests = true;
   this.filter = null;
+ this.flows = {}; // To store flow information
 };
 
 SAMLTrace.TraceWindow.prototype = {
@@ -752,6 +806,27 @@ SAMLTrace.TraceWindow.prototype = {
     this.colorizeRequests = colorizeRequests;
   },
 
+ 'determineFlowId': function(request) {
+ const initiator = request.initiator;
+ const tabId = request.tabId;
+
+    // If it's the first request in a potential flow, return null.
+    // We can't determine the flow ID until we see a subsequent request.
+ if (!initiator || initiator.type === 'other') {
+ return null;
+    }
+
+ const flowKey = `${initiator.url}-${tabId}`;
+
+ if (!this.flows[flowKey]) {
+      // This is the first request we've seen for this initiator/tab combination, start a new flow.
+ this.flows[flowKey] = `flow-${Object.keys(this.flows).length + 1}`;
+ return null;
+    }
+
+    // Subsequent requests with the same initiator and tabId belong to the same flow.
+ return this.flows[flowKey];
+  },
   'updateStatusBar' : function() {
     let hiddenElementsString = "";
     if (this.hideResources || this.showProtocolOnly) {
@@ -803,7 +878,11 @@ SAMLTrace.TraceWindow.prototype = {
       // Maybe revise the HTTP method on redirected requests
       let alterationResult = tracer.reviseRedirectedRequestMethod(request, id);
       let entry = { id: alterationResult.id, req: alterationResult.request };
+
+      // Determine and attach the flow ID
+ entry.req.flowId = tracer.determineFlowId(entry.req);
       tracer.httpRequests.push(entry);
+
     });
   },
 

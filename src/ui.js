@@ -6,6 +6,7 @@ window.addEventListener("load", function(e) {
   ui.bindKeys();
   ui.bindScrollRequestList();
   ui.initContentSplitter();
+  ui.bindContextMenu(); // NYTT ANROP
   ui.enableSyntaxHighlighting();
 
   // attach resize event
@@ -121,6 +122,50 @@ ui = {
 
     let modalCloseButtons = document.querySelectorAll(".modal-close");
     modalCloseButtons.forEach(button => button.addEventListener("click", ui.hideDialogs, true));
+  },
+
+  // I ui-objektet
+  bindContextMenu: function() {
+    const contextMenu = document.getElementById('context-menu');
+    const requestList = document.getElementById('request-list');
+    let currentRequestItem = null;
+
+    requestList.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      const row = e.target.closest('.list-row');
+      if (!row) return;
+
+      currentRequestItem = row.requestItem;
+
+      // Villkorlig visning av menyalternativ
+      document.getElementById('export-saml').style.display = currentRequestItem.request.saml ? 'block' : 'none';
+      document.getElementById('export-cert').style.display = currentRequestItem.request.certificates && currentRequestItem.request.certificates.length > 0 ? 'block' : 'none';
+
+      contextMenu.style.left = `${e.pageX}px`;
+      contextMenu.style.top = `${e.pageY}px`;
+      contextMenu.style.display = 'block';
+    });
+
+    // Göm menyn vid klick utanför
+    document.addEventListener('click', () => {
+      contextMenu.style.display = 'none';
+      currentRequestItem = null;
+    });
+
+    // Lägg till händelselyssnare för menyalternativen
+    const io = new SAMLTraceIO();
+    document.getElementById('export-curl').addEventListener('click', () => {
+      if (currentRequestItem) io.exportAsCurl(currentRequestItem.request);
+    });
+    document.getElementById('export-saml').addEventListener('click', () => {
+      if (currentRequestItem) io.exportSamlAsXml(currentRequestItem.request);
+    });
+    document.getElementById('export-cert').addEventListener('click', () => {
+      if (currentRequestItem && currentRequestItem.request.certificates) {
+        // Exporterar endast det första certifikatet för enkelhetens skull
+        io.exportCertAsPem(currentRequestItem.request.certificates[0], 0);
+      }
+    });
   },
   
   bindButtons: function() {
